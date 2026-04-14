@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520" role="img" aria-label="Order book diagram with bids and asks around a mid price">
+  <defs>
+    <style>
+      .bg{fill:#0b0b0f}
+      .panel{fill:#111118;stroke:#2a2a36;stroke-width:2}
+      .title{fill:#f5f5f5;font:600 22px Inter,Segoe UI,Arial,sans-serif}
+      .sub{fill:#a1a1aa;font:400 15px Inter,Segoe UI,Arial,sans-serif}
+      .hdr{fill:#a1a1aa;font:600 13px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+      .cell{fill:#d4d4d8;font:500 14px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+      .muted{fill:#52525b}
+      .line{stroke:#2a2a36;stroke-width:2}
+      .bid{fill:#0f1a13;stroke:#2a2a36;stroke-width:2}
+      .ask{fill:#1a1010;stroke:#2a2a36;stroke-width:2}
+      .tag{fill:#111118;stroke:#2a2a36;stroke-width:2}
+      .tagText{fill:#f5f5f5;font:600 13px Inter,Segoe UI,Arial,sans-serif}
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1200" height="520" rx="18"/>
+
+  <text class="title" x="42" y="62">Order Book (Bids vs Asks)</text>
+  <text class="sub" x="42" y="90">Highest bid and lowest ask define the spread. Mid‑price is the average of the two.</text>
+
+  <!-- Bid panel -->
+  <g transform="translate(60,130)">
+    <rect class="panel" width="520" height="330" rx="14"/>
+    <rect class="tag" x="18" y="18" width="92" height="28" rx="14"/>
+    <text class="tagText" x="36" y="38">BIDS</text>
+    <text class="hdr" x="24" y="76">price</text>
+    <text class="hdr" x="170" y="76">size</text>
+    <text class="hdr" x="290" y="76">orders</text>
+    <line class="line" x1="24" y1="90" x2="496" y2="90"/>
+
+    <!-- rows -->
+    <g>
+      <rect class="bid" x="18" y="108" width="484" height="44" rx="10"/>
+      <text class="cell" x="30" y="136">$150.00</text>
+      <text class="cell" x="170" y="136">1,200</text>
+      <text class="cell" x="290" y="136">12</text>
+    </g>
+    <g>
+      <rect class="bid" x="18" y="160" width="484" height="44" rx="10" opacity="0.92"/>
+      <text class="cell" x="30" y="188">$149.99</text>
+      <text class="cell" x="170" y="188">800</text>
+      <text class="cell" x="290" y="188">7</text>
+    </g>
+    <g>
+      <rect class="bid" x="18" y="212" width="484" height="44" rx="10" opacity="0.84"/>
+      <text class="cell" x="30" y="240">$149.98</text>
+      <text class="cell" x="170" y="240">650</text>
+      <text class="cell" x="290" y="240">5</text>
+    </g>
+    <g>
+      <rect class="bid" x="18" y="264" width="484" height="44" rx="10" opacity="0.76"/>
+      <text class="cell" x="30" y="292">$149.97</text>
+      <text class="cell" x="170" y="292">420</text>
+      <text class="cell" x="290" y="292">3</text>
+    </g>
+    <g>
+      <rect class="bid" x="18" y="316" width="484" height="44" rx="10" opacity="0.68"/>
+      <text class="cell" x="30" y="344">$149.96</text>
+      <text class="cell" x="170" y="344">300</text>
+      <text class="cell" x="290" y="344">2</text>
+    </g>
+  </g>
+
+  <!-- Ask panel -->
+  <g transform="translate(620,130)">
+    <rect class="panel" width="520" height="330" rx="14"/>
+    <rect class="tag" x="18" y="18" width="92" height="28" rx="14"/>
+    <text class="tagText" x="36" y="38">ASKS</text>
+    <text class="hdr" x="24" y="76">price</text>
+    <text class="hdr" x="170" y="76">size</text>
+    <text class="hdr" x="290" y="76">orders</text>
+    <line class="line" x1="24" y1="90" x2="496" y2="90"/>
+
+    <!-- rows -->
+    <g>
+      <rect class="ask" x="18" y="108" width="484" height="44" rx="10"/>
+      <text class="cell" x="30" y="136">$150.01</text>
+      <text class="cell" x="170" y="136">1,050</text>
+      <text class="cell" x="290" y="136">10</text>
+    </g>
+    <g>
+      <rect class="ask" x="18" y="160" width="484" height="44" rx="10" opacity="0.92"/>
+      <text class="cell" x="30" y="188">$150.02</text>
+      <text class="cell" x="170" y="188">740</text>
+      <text class="cell" x="290" y="188">6</text>
+    </g>
+    <g>
+      <rect class="ask" x="18" y="212" width="484" height="44" rx="10" opacity="0.84"/>
+      <text class="cell" x="30" y="240">$150.03</text>
+      <text class="cell" x="170" y="240">520</text>
+      <text class="cell" x="290" y="240">4</text>
+    </g>
+    <g>
+      <rect class="ask" x="18" y="264" width="484" height="44" rx="10" opacity="0.76"/>
+      <text class="cell" x="30" y="292">$150.04</text>
+      <text class="cell" x="170" y="292">410</text>
+      <text class="cell" x="290" y="292">3</text>
+    </g>
+    <g>
+      <rect class="ask" x="18" y="316" width="484" height="44" rx="10" opacity="0.68"/>
+      <text class="cell" x="30" y="344">$150.05</text>
+      <text class="cell" x="170" y="344">260</text>
+      <text class="cell" x="290" y="344">2</text>
+    </g>
+  </g>
+
+  <!-- Spread + mid -->
+  <g transform="translate(60,470)">
+    <rect class="panel" width="1080" height="28" rx="14" opacity="0.75"/>
+    <text class="sub" x="18" y="19">Spread = (best ask − best bid) • Mid = (best ask + best bid) ÷ 2 • Strategy typically quotes around mid</text>
+  </g>
+</svg>
+

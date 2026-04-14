@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-label="FPGA-style HFT pipeline: Feed Parser to Order Book to Strategy to Execution">
+  <defs>
+    <style>
+      .bg{fill:#0b0b0f}
+      .card{fill:#111118;stroke:#2a2a36;stroke-width:2}
+      .title{fill:#f5f5f5;font:600 22px Inter,Segoe UI,Arial,sans-serif}
+      .sub{fill:#a1a1aa;font:400 15px Inter,Segoe UI,Arial,sans-serif}
+      .label{fill:#f5f5f5;font:600 16px Inter,Segoe UI,Arial,sans-serif}
+      .hint{fill:#a1a1aa;font:400 13px Inter,Segoe UI,Arial,sans-serif}
+      .accent{fill:#ffffff}
+      .muted{fill:#52525b}
+      .mono{fill:#d4d4d8;font:600 13px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    </style>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.05"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#a1a1aa"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1200" height="360" rx="18"/>
+  <rect x="18" y="18" width="1164" height="324" rx="16" fill="url(#g)" stroke="#1f1f2a" stroke-width="2"/>
+
+  <text class="title" x="42" y="62">FPGA‑Style HFT Pipeline (Conceptual)</text>
+  <text class="sub" x="42" y="90">Market data flows through fixed stages; each stage does one job fast.</text>
+
+  <!-- Cards -->
+  <g transform="translate(60,130)">
+    <rect class="card" width="250" height="170" rx="14"/>
+    <text class="label" x="20" y="44">1) Feed Parser</text>
+    <text class="hint" x="20" y="74">Decode ITCH‑like bytes → events</text>
+    <text class="mono" x="20" y="110">src/feed_parser</text>
+    <circle class="accent" cx="214" cy="42" r="6" opacity="0.9"/>
+  </g>
+
+  <g transform="translate(350,130)">
+    <rect class="card" width="250" height="170" rx="14"/>
+    <text class="label" x="20" y="44">2) Order Book</text>
+    <text class="hint" x="20" y="74">Maintain bid/ask levels in memory</text>
+    <text class="mono" x="20" y="110">src/order_book</text>
+    <circle class="accent" cx="214" cy="42" r="6" opacity="0.9"/>
+  </g>
+
+  <g transform="translate(640,130)">
+    <rect class="card" width="250" height="170" rx="14"/>
+    <text class="label" x="20" y="44">3) Strategy</text>
+    <text class="hint" x="20" y="74">Generate quotes + basic risk checks</text>
+    <text class="mono" x="20" y="110">src/strategy</text>
+    <circle class="accent" cx="214" cy="42" r="6" opacity="0.9"/>
+  </g>
+
+  <g transform="translate(930,130)">
+    <rect class="card" width="210" height="170" rx="14"/>
+    <text class="label" x="20" y="44">4) Execution</text>
+    <text class="hint" x="20" y="74">Paper/simulated fills</text>
+    <text class="mono" x="20" y="110">src/main.py</text>
+    <circle class="accent" cx="174" cy="42" r="6" opacity="0.9"/>
+  </g>
+
+  <!-- Arrows -->
+  <line x1="310" y1="215" x2="350" y2="215" stroke="#a1a1aa" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="600" y1="215" x2="640" y2="215" stroke="#a1a1aa" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="890" y1="215" x2="930" y2="215" stroke="#a1a1aa" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <!-- Footer -->
+  <text class="sub" x="42" y="324">Tip: treat each box like a hardware block — deterministic inputs/outputs, measured latency.</text>
+</svg>
+

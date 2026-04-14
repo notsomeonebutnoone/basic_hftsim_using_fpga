@@ -1,6 +1,16 @@
 # FPGA-Based HFT System (Software Simulation)
 
-A learning project demonstrating High-Frequency Trading concepts using FPGA-style architecture, implemented entirely in software.
+An educational project that explains **high‑frequency trading (HFT)** concepts using an **FPGA‑style pipeline** (fixed stages, measurable latency), built in **Python** with a small **web demo**.
+
+| What this is | What this is not |
+|---|---|
+| A learning simulator + visualization | A production trading system |
+| A “think like hardware” pipeline model | A complete broker/exchange integration |
+| A safe place to measure/optimize stages | Financial advice |
+
+<p align="center">
+  <img src="docs/diagrams/pipeline.svg" alt="FPGA-style HFT pipeline diagram" width="900" />
+</p>
 
 ## 🎯 Goal
 
@@ -11,7 +21,18 @@ Build an HFT system that *thinks like an FPGA* without requiring actual hardware
 - Pipeline architecture (FPGA-style parallelism)
 - Latency measurement and optimization
 
-## 🏗️ Architecture
+## 🧩 The Big Idea (Layman View)
+
+HFT is basically a fast decision loop:
+
+1. **Read** what the market is doing (prices/orders/trades)
+2. **Update** your internal “picture” of supply/demand (order book)
+3. **Decide** what to do (strategy)
+4. **Act** (send an order / simulate one)
+
+This repo models those as *separate pipeline stages* so you can reason about latency like hardware.
+
+## 🏗️ Architecture (Text)
 
 ```
 ┌─────────────────┐
@@ -36,6 +57,34 @@ Build an HFT system that *thinks like an FPGA* without requiring actual hardware
 │  Order Executor │ ← Sends orders (simulated)
 └─────────────────┘
 ```
+
+## 📊 Order Book in One Picture
+
+<p align="center">
+  <img src="docs/diagrams/order_book.svg" alt="Order book bids/asks diagram" width="900" />
+</p>
+
+**Glossary (quick):**
+
+| Term | Meaning |
+|---|---|
+| Bid | Buy interest (buyers) |
+| Ask | Sell interest (sellers) |
+| Spread | Best ask − best bid |
+| Mid price | (Best ask + best bid) ÷ 2 |
+| Level | A price bucket with many orders |
+
+## ⏱️ Latency Budget (Why Pipelines Matter)
+
+<p align="center">
+  <img src="docs/diagrams/latency_budget.svg" alt="Latency budget timeline diagram" width="900" />
+</p>
+
+## 🧠 FPGA‑Style vs Typical Software
+
+<p align="center">
+  <img src="docs/diagrams/fpga_vs_software.svg" alt="FPGA vs software mental model diagram" width="900" />
+</p>
 
 ## 📁 Project Structure
 
@@ -131,6 +180,16 @@ python src/backtest/backtester.py
 | Total round-trip | < 10 μs | End-to-end |
 
 *Note: Real FPGA systems achieve < 100ns total. This is a learning tool.*
+
+## 🗺️ Where To Look (If You’re New)
+
+| You want to understand… | Start here |
+|---|---|
+| The full end‑to‑end flow | `src/main.py` |
+| How messages become events | `src/feed_parser/feed_parser.py` |
+| How bids/asks are stored | `src/order_book/order_book.py` |
+| How a simple market maker quotes | `src/strategy/market_maker.py` |
+| The web demo | `web/index.html` + `web/app.js` |
 
 ## 🔮 Future Extensions
 
