@@ -1,0 +1,17 @@
+{
+  "name": "hft-fpga-project",
+  "private": true,
+  "version": "0.0.0",
+  "description": "FPGA-style HFT pipeline simulator (web demo launcher)",
+  "scripts": {
+    "dev": "node web/server.js",
+    "start": "node web/server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
+
