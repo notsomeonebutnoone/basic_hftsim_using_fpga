@@ -5,3 +5,29 @@ for asic, it is different, they should go with what the cell library uses.
 using the other one can incur penalties. (if the cell library is using active high, it should use active high, and vice versa)
 
 on PCB level you almost always want to use active low as it is much easier to keeep the reset nailed to the ground 
+
+'''
+self.fills = [
+    {
+        "order_id": 101,
+        "symbol": "AAPL",
+        "price": 15025,        # $150.25 (stored in cents)
+        "quantity": 100,
+        "side": "BUY",
+        "timestamp_ns": 1712345678901234567,
+        "status": "FILLED"
+    },
+    {
+        "order_id": 102,
+        "symbol": "AAPL",  #ticker label 
+        "price": 15030,    # 
+        "quantity": 200,
+        "side": "SELL",  
+        "timestamp_ns": 1712345679901234567, 
+        "status": "FILLED" 
+    }
+]
+
+'''
+
+
