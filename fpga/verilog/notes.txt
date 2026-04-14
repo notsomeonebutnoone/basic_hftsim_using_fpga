@@ -1,0 +1,7 @@
+for FPGA active high or active low does not matter as much 
+but the time the logic is loaded, the supply voltage is aldready stable. 
+
+for asic, it is different, they should go with what the cell library uses. 
+using the other one can incur penalties. (if the cell library is using active high, it should use active high, and vice versa)
+
+on PCB level you almost always want to use active low as it is much easier to keeep the reset nailed to the ground 

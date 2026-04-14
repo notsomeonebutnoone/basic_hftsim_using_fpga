@@ -1,9 +1,10 @@
 // FPGA Order Book Module
 // Implements parallel order book with O(1) insert/delete
 // Target: Xilinx Artix-7 or Intel Cyclone V
+// Handles Orders in parallel in constant time 
 
 module order_book #(
-    parameter DATA_WIDTH = 32,
+    parameter DATA_WIDTH = 32, 
     parameter PRICE_WIDTH = 16,
     parameter QTY_WIDTH = 16,
     parameter ORDER_ID_WIDTH = 32,
