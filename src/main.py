@@ -21,37 +21,8 @@ class ExecutionEngine:
     
     def __init__(self):
         self.fills: List[Dict] = []
-     
-
-'''
-self.fills = [
-    {
-        "order_id": 101,
-        "symbol": "AAPL",
-        "price": 15025,        # $150.25 (stored in cents)
-        "quantity": 100,
-        "side": "BUY",
-        "timestamp_ns": 1712345678901234567,
-        "status": "FILLED"
-    },
-    {
-        "order_id": 102,
-        "symbol": "AAPL",  #ticker label 
-        "price": 15030,    # 
-        "quantity": 200,
-        "side": "SELL",  
-        "timestamp_ns": 1712345679901234567, 
-        "status": "FILLED" 
-    }
-]
-
-'''
-
-
-
-
         self.latencies: List[int] = []
-    
+
     def submit_order(self, order_data: Dict) -> Dict:
         """Submit order and simulate fill"""
         start_ns = time.perf_counter_ns()
