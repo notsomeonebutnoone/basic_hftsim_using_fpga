@@ -1,10 +1,21 @@
 // HFT FPGA Simulator - Live Demo
+// This page can run in two modes:
+// - Local simulation (no network)
+// - Live market-data via ws://localhost:8080/ws (Coinbase Advanced market data proxied by Node)
 let running = false;
 let simulationInterval;
 let orderBook = { bids: [], asks: [] };
-let metrics = { latency: 0, throughput: 0, pnl: 0, position: 0 };
+let metrics = { latency: 0, throughput: 0, pnl: 0, position: 0, volume24h: null };
 let trades = [];
 let pnlHistory = [];
+
+let liveMode = false;
+let liveSocket = null;
+let liveProductId = "BTC-USD";
+
+// Live L2 state (price -> size)
+const liveBids = new Map();
+const liveAsks = new Map();
 
 class HFTSimulator {
     constructor() {
@@ -108,8 +119,174 @@ class HFTSimulator {
 
 const simulator = new HFTSimulator();
 
+function fmtNumber(value, decimals = 2) {
+    if (value === null || value === undefined || Number.isNaN(value)) return "—";
+    return Number(value).toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+}
+
+function fmtSize(value) {
+    if (value === null || value === undefined || Number.isNaN(value)) return "—";
+    const v = Number(value);
+    if (v >= 1000) return v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    if (v >= 1) return v.toLocaleString(undefined, { maximumFractionDigits: 6 });
+    return v.toLocaleString(undefined, { maximumFractionDigits: 8 });
+}
+
+function computeDepthArraysFromMaps(maxLevels = 10) {
+    const bids = Array.from(liveBids.entries())
+        .map(([price, size]) => ({ price, size }))
+        .sort((a, b) => b.price - a.price)
+        .slice(0, maxLevels);
+
+    const asks = Array.from(liveAsks.entries())
+        .map(([price, size]) => ({ price, size }))
+        .sort((a, b) => a.price - b.price)
+        .slice(0, maxLevels);
+
+    // Convert into the existing UI shape
+    orderBook = {
+        bids: bids.map(l => ({ price: Math.round(l.price * 100), size: l.size, orders: "—" })),
+        asks: asks.map(l => ({ price: Math.round(l.price * 100), size: l.size, orders: "—" })),
+    };
+
+    const bestBid = bids[0]?.price ?? 0;
+    const bestAsk = asks[0]?.price ?? 0;
+    const spread = bestBid > 0 && bestAsk > 0 ? (bestAsk - bestBid) : 0;
+    const mid = bestBid > 0 && bestAsk > 0 ? (bestBid + bestAsk) / 2 : 0;
+
+    return { spread, mid };
+}
+
+function applyCoinbaseLevel2(payload) {
+    // payload.payload is the full Coinbase message as forwarded by server.js
+    const msg = payload?.payload;
+    if (!msg?.events?.length) return;
+
+    for (const ev of msg.events) {
+        if (ev.type === "snapshot") {
+            liveBids.clear();
+            liveAsks.clear();
+
+            const bids = ev.bids || [];
+            const asks = ev.asks || [];
+            for (const [p, s] of bids) {
+                const price = Number(p);
+                const size = Number(s);
+                if (size > 0) liveBids.set(price, size);
+            }
+            for (const [p, s] of asks) {
+                const price = Number(p);
+                const size = Number(s);
+                if (size > 0) liveAsks.set(price, size);
+            }
+        } else if (ev.type === "update") {
+            const updates = ev.updates || [];
+            for (const u of updates) {
+                const side = u.side; // "bid" or "offer"
+                const price = Number(u.price_level);
+                const size = Number(u.new_quantity);
+                if (!Number.isFinite(price) || !Number.isFinite(size)) continue;
+
+                const book = side === "bid" ? liveBids : liveAsks;
+                if (size <= 0) book.delete(price);
+                else book.set(price, size);
+            }
+        }
+    }
+}
+
+function applyCoinbaseTrades(payload) {
+    const msg = payload?.payload;
+    if (!msg?.events?.length) return;
+
+    for (const ev of msg.events) {
+        const t = ev.trades || [];
+        for (const tr of t) {
+            trades.unshift({
+                id: tr.trade_id || String(Date.now()),
+                price: Number(tr.price),
+                quantity: Number(tr.size),
+                side: tr.side === "BUY" ? "B" : "S",
+                time: new Date(tr.time).toLocaleTimeString(),
+            });
+        }
+    }
+
+    if (trades.length > 30) trades = trades.slice(0, 30);
+}
+
+function applyCoinbaseTicker(payload) {
+    const msg = payload?.payload;
+    if (!msg?.events?.length) return;
+
+    const last = msg.events[msg.events.length - 1];
+    const tick = last?.tickers?.[0];
+    if (!tick) return;
+
+    metrics.volume24h = tick.volume_24_h ? Number(tick.volume_24_h) : metrics.volume24h;
+}
+
+function connectLive() {
+    try {
+        liveSocket = new WebSocket(`ws://${window.location.host}/ws`);
+    } catch {
+        return false;
+    }
+
+    liveSocket.onopen = () => {
+        liveMode = true;
+        document.getElementById('statusText').textContent = 'Live';
+        const statusDot = document.getElementById('statusDot');
+        if (statusDot) statusDot.classList.add('running');
+        document.querySelectorAll('.pipeline-stage').forEach(stage => stage.classList.add('active'));
+    };
+
+    liveSocket.onmessage = (evt) => {
+        const data = safeJsonParse(evt.data);
+        if (!data) return;
+
+        if (data.type === "hello") {
+            liveProductId = data.product_id || liveProductId;
+            return;
+        }
+
+        if (data.type === "coinbase") {
+            if (data.channel === "level2") applyCoinbaseLevel2(data);
+            if (data.channel === "market_trades") applyCoinbaseTrades(data);
+            if (data.channel === "ticker") applyCoinbaseTicker(data);
+
+            // Update UI from live state
+            const { spread, mid } = computeDepthArraysFromMaps(10);
+            updateOrderBookUI(true);
+            updateMetricsUI(spread, mid, true);
+            updateTradesUI(true);
+            drawChart();
+        }
+    };
+
+    liveSocket.onclose = () => {
+        liveMode = false;
+        liveSocket = null;
+        document.getElementById('statusText').textContent = 'Disconnected';
+        const statusDot = document.getElementById('statusDot');
+        if (statusDot) statusDot.classList.remove('running');
+        document.querySelectorAll('.pipeline-stage').forEach(stage => stage.classList.remove('active'));
+    };
+
+    liveSocket.onerror = () => {
+        // If localhost ws is not running, fall back to simulation.
+    };
+
+    return true;
+}
+
+function safeJsonParse(text) {
+    try { return JSON.parse(text); } catch { return null; }
+}
+
 function startSimulation() {
     if (running) return;
+    if (liveMode) return; // live mode is continuous; no start/stop needed
     running = true;
     simulator.startTime = Date.now();
     simulator.eventCount = 0;
@@ -144,6 +321,7 @@ function startSimulation() {
 }
 
 function stopSimulation() {
+    if (liveMode) return;
     running = false;
     clearInterval(simulationInterval);
     document.getElementById('statusText').textContent = 'Stopped';
@@ -152,14 +330,17 @@ function stopSimulation() {
     document.querySelectorAll('.pipeline-stage').forEach(stage => stage.classList.remove('active'));
 }
 
-function updateOrderBookUI() {
+function updateOrderBookUI(isLive = false) {
     const asksBody = document.getElementById('asksBody');
     const bidsBody = document.getElementById('bidsBody');
+
+    const maxAsk = Math.max(1, ...orderBook.asks.slice(0, 5).map(l => Number(l.size) || 0));
+    const maxBid = Math.max(1, ...orderBook.bids.slice(0, 5).map(l => Number(l.size) || 0));
     
     asksBody.innerHTML = orderBook.asks.slice(0, 5).reverse().map(level => `
         <tr class="ask-row">
             <td class="ask-price">$${(level.price / 100).toFixed(2)}</td>
-            <td>${level.size}</td>
+            <td class="depth-cell" style="--depth:${Math.min(100, ((Number(level.size)||0) / maxAsk) * 100).toFixed(0)}%"><span>${fmtSize(level.size)}</span></td>
             <td>${level.orders}</td>
         </tr>
     `).join('');
@@ -167,29 +348,30 @@ function updateOrderBookUI() {
     bidsBody.innerHTML = orderBook.bids.slice(0, 5).map(level => `
         <tr class="bid-row">
             <td class="bid-price">$${(level.price / 100).toFixed(2)}</td>
-            <td>${level.size}</td>
+            <td class="depth-cell" style="--depth:${Math.min(100, ((Number(level.size)||0) / maxBid) * 100).toFixed(0)}%"><span>${fmtSize(level.size)}</span></td>
             <td>${level.orders}</td>
         </tr>
     `).join('');
 }
 
-function updateMetricsUI(spread, mid) {
+function updateMetricsUI(spread, mid, isLive = false) {
     document.getElementById('spread').textContent = `$${spread.toFixed(2)}`;
     document.getElementById('midPrice').textContent = `$${mid.toFixed(2)}`;
-    document.getElementById('latency').textContent = simulator.calculateMetrics().latency;
-    document.getElementById('throughput').textContent = metrics.throughput;
+    document.getElementById('latency').textContent = isLive ? "—" : simulator.calculateMetrics().latency;
+    document.getElementById('throughput').textContent = isLive ? liveProductId : metrics.throughput;
+    document.getElementById('volume24h').textContent = metrics.volume24h === null ? "—" : fmtNumber(metrics.volume24h, 4);
     document.getElementById('pnl').textContent = `$${metrics.pnl.toFixed(2)}`;
     document.getElementById('position').textContent = metrics.position;
 }
 
-function updateTradesUI() {
+function updateTradesUI(isLive = false) {
     const tradesList = document.getElementById('tradesList');
     tradesList.innerHTML = trades.map(trade => `
         <div class="trade-item">
             <span class="${trade.side === 'B' ? 'trade-buy' : 'trade-sell'}">
                 ${trade.side === 'B' ? 'BUY' : 'SELL'}
             </span>
-            <span>$${trade.price.toFixed(2)} x ${trade.quantity}</span>
+            <span>$${Number(trade.price).toFixed(2)} x ${fmtSize(trade.quantity)}</span>
             <span style="color: #666">${trade.time}</span>
         </div>
     `).join('');
@@ -237,5 +419,6 @@ function drawChart() {
 }
 
 // Initialize
+connectLive();
 updateOrderBookUI();
 updateMetricsUI(0, 150);

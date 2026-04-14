@@ -8,10 +8,11 @@
     "start": "node web/server.js"
   },
   "dependencies": {
-    "express": "^4.19.2"
+    "@coinbase/cdp-sdk": "^1.1.0",
+    "express": "^4.19.2",
+    "ws": "^8.18.1"
   },
   "engines": {
     "node": ">=18"
   }
 }
-

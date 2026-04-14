@@ -196,6 +196,26 @@ h2 {
   font-weight: 500;
 }
 
+/* Depth bars (volume visualization) */
+.depth-cell {
+  position: relative;
+  overflow: hidden;
+}
+
+.depth-cell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: var(--depth, 0%);
+  background: rgba(255, 255, 255, 0.06);
+  transform: translateX(calc(-100% + var(--depth, 0%)));
+}
+
+.depth-cell > span {
+  position: relative;
+  z-index: 1;
+}
+
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
