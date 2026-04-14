@@ -17,6 +17,9 @@ let liveProductId = "BTC-USD";
 const liveBids = new Map();
 const liveAsks = new Map();
 
+const recentPrints = []; // {side:'B'|'S', qty:number, price:number, time:string}
+const recentPrices = []; // number
+
 class HFTSimulator {
     constructor() {
         this.symbol = 'AAPL';
@@ -132,6 +135,16 @@ function fmtSize(value) {
     return v.toLocaleString(undefined, { maximumFractionDigits: 8 });
 }
 
+function fmtCompact(value) {
+    const v = Number(value);
+    if (!Number.isFinite(v)) return "—";
+    const abs = Math.abs(v);
+    if (abs >= 1e9) return `${(v / 1e9).toFixed(2)}B`;
+    if (abs >= 1e6) return `${(v / 1e6).toFixed(2)}M`;
+    if (abs >= 1e3) return `${(v / 1e3).toFixed(2)}K`;
+    return v.toFixed(2);
+}
+
 function computeDepthArraysFromMaps(maxLevels = 10) {
     const bids = Array.from(liveBids.entries())
         .map(([price, size]) => ({ price, size }))
@@ -155,6 +168,22 @@ function computeDepthArraysFromMaps(maxLevels = 10) {
     const mid = bestBid > 0 && bestAsk > 0 ? (bestBid + bestAsk) / 2 : 0;
 
     return { spread, mid };
+}
+
+function computeDepthSums(mid, pct) {
+    if (!mid || !Number.isFinite(mid)) return { bid: 0, ask: 0 };
+    const bidMin = mid * (1 - pct);
+    const askMax = mid * (1 + pct);
+
+    let bidSum = 0;
+    for (const [price, size] of liveBids.entries()) {
+        if (price >= bidMin) bidSum += size;
+    }
+    let askSum = 0;
+    for (const [price, size] of liveAsks.entries()) {
+        if (price <= askMax) askSum += size;
+    }
+    return { bid: bidSum, ask: askSum };
 }
 
 function applyCoinbaseLevel2(payload) {
@@ -202,13 +231,26 @@ function applyCoinbaseTrades(payload) {
     for (const ev of msg.events) {
         const t = ev.trades || [];
         for (const tr of t) {
+            const side = tr.side === "BUY" ? "B" : "S";
+            const price = Number(tr.price);
+            const quantity = Number(tr.size);
+            const time = new Date(tr.time).toLocaleTimeString();
+
             trades.unshift({
                 id: tr.trade_id || String(Date.now()),
-                price: Number(tr.price),
-                quantity: Number(tr.size),
-                side: tr.side === "BUY" ? "B" : "S",
-                time: new Date(tr.time).toLocaleTimeString(),
+                price,
+                quantity,
+                side,
+                time,
             });
+
+            recentPrints.unshift({ side, price, qty: quantity, time });
+            if (recentPrints.length > 200) recentPrints.length = 200;
+
+            if (Number.isFinite(price)) {
+                recentPrices.push(price);
+                if (recentPrices.length > 600) recentPrices.shift();
+            }
         }
     }
 
@@ -235,10 +277,12 @@ function connectLive() {
 
     liveSocket.onopen = () => {
         liveMode = true;
-        document.getElementById('statusText').textContent = 'Live';
+        const statusText = document.getElementById('statusText');
+        if (statusText) statusText.textContent = 'Connected';
+        const connPill = document.getElementById('connPill');
+        if (connPill) connPill.textContent = 'Connected';
         const statusDot = document.getElementById('statusDot');
         if (statusDot) statusDot.classList.add('running');
-        document.querySelectorAll('.pipeline-stage').forEach(stage => stage.classList.add('active'));
     };
 
     liveSocket.onmessage = (evt) => {
@@ -247,6 +291,14 @@ function connectLive() {
 
         if (data.type === "hello") {
             liveProductId = data.product_id || liveProductId;
+            const productPill = document.getElementById("productPill");
+            const chartSymbol = document.getElementById("chartSymbol");
+            const obSymbol = document.getElementById("obSymbol");
+            const tradesSymbol = document.getElementById("tradesSymbol");
+            if (productPill) productPill.textContent = liveProductId;
+            if (chartSymbol) chartSymbol.textContent = liveProductId;
+            if (obSymbol) obSymbol.textContent = liveProductId;
+            if (tradesSymbol) tradesSymbol.textContent = liveProductId;
             return;
         }
 
@@ -257,20 +309,19 @@ function connectLive() {
 
             // Update UI from live state
             const { spread, mid } = computeDepthArraysFromMaps(10);
-            updateOrderBookUI(true);
-            updateMetricsUI(spread, mid, true);
-            updateTradesUI(true);
-            drawChart();
+            updateTerminalUI({ spread, mid });
         }
     };
 
     liveSocket.onclose = () => {
         liveMode = false;
         liveSocket = null;
-        document.getElementById('statusText').textContent = 'Disconnected';
+        const statusText = document.getElementById('statusText');
+        if (statusText) statusText.textContent = 'Disconnected';
+        const connPill = document.getElementById('connPill');
+        if (connPill) connPill.textContent = 'Disconnected';
         const statusDot = document.getElementById('statusDot');
         if (statusDot) statusDot.classList.remove('running');
-        document.querySelectorAll('.pipeline-stage').forEach(stage => stage.classList.remove('active'));
     };
 
     liveSocket.onerror = () => {
@@ -282,6 +333,23 @@ function connectLive() {
 
 function safeJsonParse(text) {
     try { return JSON.parse(text); } catch { return null; }
+}
+
+function updateTerminalUI({ spread, mid }) {
+    updateOrderbookPanel({ spread, mid });
+    updateTradesPanel();
+    updateStatsPanel({ mid });
+    drawPriceChart();
+
+    const midText = document.getElementById("midText");
+    const spreadText = document.getElementById("spreadText");
+    const vol24hText = document.getElementById("vol24hText");
+    if (midText) midText.textContent = `Mid: ${mid ? `$${mid.toFixed(2)}` : "—"}`;
+    if (spreadText) spreadText.textContent = `Spr: ${spread ? `$${spread.toFixed(2)}` : "—"}`;
+    if (vol24hText) vol24hText.textContent = `Vol: ${metrics.volume24h === null ? "—" : fmtCompact(metrics.volume24h)}`;
+
+    const lastUpdate = document.getElementById("lastUpdate");
+    if (lastUpdate) lastUpdate.textContent = `LIVE · ${new Date().toLocaleTimeString()}`;
 }
 
 function startSimulation() {
@@ -330,95 +398,163 @@ function stopSimulation() {
     document.querySelectorAll('.pipeline-stage').forEach(stage => stage.classList.remove('active'));
 }
 
-function updateOrderBookUI(isLive = false) {
-    const asksBody = document.getElementById('asksBody');
-    const bidsBody = document.getElementById('bidsBody');
+function updateOrderbookPanel({ spread, mid }) {
+    const obPrice = document.getElementById("obPrice");
+    if (obPrice) obPrice.textContent = mid ? `$${mid.toFixed(2)}` : "—";
 
-    const maxAsk = Math.max(1, ...orderBook.asks.slice(0, 5).map(l => Number(l.size) || 0));
-    const maxBid = Math.max(1, ...orderBook.bids.slice(0, 5).map(l => Number(l.size) || 0));
-    
-    asksBody.innerHTML = orderBook.asks.slice(0, 5).reverse().map(level => `
-        <tr class="ask-row">
-            <td class="ask-price">$${(level.price / 100).toFixed(2)}</td>
-            <td class="depth-cell" style="--depth:${Math.min(100, ((Number(level.size)||0) / maxAsk) * 100).toFixed(0)}%"><span>${fmtSize(level.size)}</span></td>
-            <td>${level.orders}</td>
-        </tr>
-    `).join('');
-    
-    bidsBody.innerHTML = orderBook.bids.slice(0, 5).map(level => `
-        <tr class="bid-row">
-            <td class="bid-price">$${(level.price / 100).toFixed(2)}</td>
-            <td class="depth-cell" style="--depth:${Math.min(100, ((Number(level.size)||0) / maxBid) * 100).toFixed(0)}%"><span>${fmtSize(level.size)}</span></td>
-            <td>${level.orders}</td>
-        </tr>
-    `).join('');
+    const rowsEl = document.getElementById("orderbookRows");
+    if (!rowsEl) return;
+
+    const levels = 24;
+    const bids = orderBook.bids.slice(0, levels).map(l => ({ price: l.price / 100, size: Number(l.size) || 0 }));
+    const asks = orderBook.asks.slice(0, levels).map(l => ({ price: l.price / 100, size: Number(l.size) || 0 }));
+
+    // Render asks on top (highest -> lowest visually), then a mid line, then bids.
+    const asksTop = [...asks].reverse();
+    const maxAsk = Math.max(1, ...asks.map(a => a.size));
+    const maxBid = Math.max(1, ...bids.map(b => b.size));
+
+    let html = "";
+    for (const a of asksTop) {
+        const w = Math.min(100, (a.size / maxAsk) * 100).toFixed(0);
+        html += `<div class="ob-row ask" style="--w:${w}%"><div class="p">$${a.price.toFixed(2)}</div><div class="s right">${fmtSize(a.size)}</div></div>`;
+    }
+
+    if (mid) {
+        html += `<div class="ob-row midline" style="--w:0%"><div class="p">$${mid.toFixed(2)}</div><div class="s right">${spread ? `spr ${spread.toFixed(2)}` : ""}</div></div>`;
+    }
+
+    for (const b of bids) {
+        const w = Math.min(100, (b.size / maxBid) * 100).toFixed(0);
+        html += `<div class="ob-row bid" style="--w:${w}%"><div class="p">$${b.price.toFixed(2)}</div><div class="s right">${fmtSize(b.size)}</div></div>`;
+    }
+
+    rowsEl.innerHTML = html;
+
+    const volSummary = document.getElementById("volSummary");
+    if (volSummary) volSummary.textContent = `24h vol: ${metrics.volume24h === null ? "—" : fmtCompact(metrics.volume24h)}`;
 }
 
-function updateMetricsUI(spread, mid, isLive = false) {
-    document.getElementById('spread').textContent = `$${spread.toFixed(2)}`;
-    document.getElementById('midPrice').textContent = `$${mid.toFixed(2)}`;
-    document.getElementById('latency').textContent = isLive ? "—" : simulator.calculateMetrics().latency;
-    document.getElementById('throughput').textContent = isLive ? liveProductId : metrics.throughput;
-    document.getElementById('volume24h').textContent = metrics.volume24h === null ? "—" : fmtNumber(metrics.volume24h, 4);
-    document.getElementById('pnl').textContent = `$${metrics.pnl.toFixed(2)}`;
-    document.getElementById('position').textContent = metrics.position;
+function updateTradesPanel() {
+    const table = document.getElementById("tradesTable");
+    if (!table) return;
+
+    const lastN = trades.slice(0, 18);
+    const exch = "CB";
+
+    table.innerHTML = lastN
+        .map((t) => {
+            const cls = t.side === "B" ? "green" : "red";
+            const value = Number(t.price) * Number(t.quantity);
+            return `<div class="trow">
+                <div>${t.time}</div>
+                <div class="amber">${exch}</div>
+                <div class="right ${cls}">${Number(t.price).toFixed(2)}</div>
+                <div class="right">${fmtSize(t.quantity)}</div>
+                <div class="right amber">$${fmtCompact(value)}</div>
+                <div class="right ${cls}">${t.side}</div>
+            </div>`;
+        })
+        .join("");
+
+    const tradeCount = document.getElementById("tradeCount");
+    if (tradeCount) tradeCount.textContent = `${trades.length} trades`;
+
+    // Buy vs sell split from recent prints
+    const sample = recentPrints.slice(0, 200);
+    const buyQty = sample.filter(p => p.side === "B").reduce((a, b) => a + (b.qty || 0), 0);
+    const sellQty = sample.filter(p => p.side === "S").reduce((a, b) => a + (b.qty || 0), 0);
+    const total = buyQty + sellQty;
+    const buyPct = total ? Math.round((buyQty / total) * 100) : 0;
+    const sellPct = total ? 100 - buyPct : 0;
+
+    const buyPctEl = document.getElementById("buyPct");
+    const sellPctEl = document.getElementById("sellPct");
+    if (buyPctEl) buyPctEl.textContent = `${buyPct}%`;
+    if (sellPctEl) sellPctEl.textContent = `${sellPct}%`;
+
+    const tradeBuyBar = document.getElementById("tradeBuyBar");
+    const tradeSellBar = document.getElementById("tradeSellBar");
+    if (tradeBuyBar) tradeBuyBar.style.width = `${buyPct}%`;
+    if (tradeSellBar) tradeSellBar.style.width = `${sellPct}%`;
 }
 
-function updateTradesUI(isLive = false) {
-    const tradesList = document.getElementById('tradesList');
-    tradesList.innerHTML = trades.map(trade => `
-        <div class="trade-item">
-            <span class="${trade.side === 'B' ? 'trade-buy' : 'trade-sell'}">
-                ${trade.side === 'B' ? 'BUY' : 'SELL'}
-            </span>
-            <span>$${Number(trade.price).toFixed(2)} x ${fmtSize(trade.quantity)}</span>
-            <span style="color: #666">${trade.time}</span>
-        </div>
-    `).join('');
+function updateStatsPanel({ mid }) {
+    const table = document.getElementById("statsTable");
+    if (!table) return;
+
+    const { bid: bid2, ask: ask2 } = computeDepthSums(mid, 0.02);
+    const { bid: bid10, ask: ask10 } = computeDepthSums(mid, 0.1);
+    const d2 = bid2 - ask2;
+    const d10 = bid10 - ask10;
+
+    table.innerHTML = `<div class="trow">
+        <div class="amber">Coinbase</div>
+        <div class="right">${mid ? mid.toFixed(2) : "—"}</div>
+        <div class="right green">${fmtCompact(bid2)}</div>
+        <div class="right red">${fmtCompact(ask2)}</div>
+        <div class="right ${d2 >= 0 ? "green" : "red"}">${d2 >= 0 ? "+" : ""}${fmtCompact(d2)}</div>
+        <div class="right green">${fmtCompact(bid10)}</div>
+        <div class="right red">${fmtCompact(ask10)}</div>
+        <div class="right ${d10 >= 0 ? "green" : "red"}">${d10 >= 0 ? "+" : ""}${fmtCompact(d10)}</div>
+    </div>`;
 }
 
-function drawChart() {
-    const canvas = document.getElementById('pnlChart');
-    const ctx = canvas.getContext('2d');
+function drawPriceChart() {
+    const canvas = document.getElementById("priceChart");
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
     const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
-    
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    if (pnlHistory.length < 2) return;
-    
-    const maxPnl = Math.max(...pnlHistory, 1);
-    const minPnl = Math.min(...pnlHistory, -1);
-    const range = maxPnl - minPnl || 1;
-    
+    canvas.width = Math.max(2, Math.floor(rect.width * window.devicePixelRatio));
+    canvas.height = Math.max(2, Math.floor(rect.height * window.devicePixelRatio));
+    ctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+
+    const w = rect.width;
+    const h = rect.height;
+    ctx.clearRect(0, 0, w, h);
+
+    const prices = recentPrices.slice(-240);
+    if (prices.length < 2) return;
+
+    const minP = Math.min(...prices);
+    const maxP = Math.max(...prices);
+    const range = maxP - minP || 1;
+
+    // Line
     ctx.beginPath();
-    ctx.strokeStyle = '#00d9ff';
     ctx.lineWidth = 2;
-    
-    pnlHistory.forEach((pnl, i) => {
-        const x = (i / (pnlHistory.length - 1)) * canvas.width;
-        const y = canvas.height - ((pnl - minPnl) / range) * canvas.height;
-        
+    ctx.strokeStyle = "rgba(255,255,255,0.85)";
+
+    for (let i = 0; i < prices.length; i++) {
+        const x = (i / (prices.length - 1)) * (w - 20) + 10;
+        const y = h - 28 - ((prices[i] - minP) / range) * (h - 60);
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
-    });
-    
+    }
     ctx.stroke();
-    
-    // Gradient fill
-    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    gradient.addColorStop(0, 'rgba(0, 217, 255, 0.3)');
-    gradient.addColorStop(1, 'rgba(0, 217, 255, 0)');
-    
-    ctx.lineTo(canvas.width, canvas.height);
-    ctx.lineTo(0, canvas.height);
-    ctx.closePath();
-    ctx.fillStyle = gradient;
-    ctx.fill();
+
+    // Volume bars from recent prints
+    const prints = recentPrints.slice(0, 120).reverse();
+    const vols = prints.map(p => p.qty || 0);
+    const maxV = Math.max(1, ...vols);
+
+    const baseY = h - 10;
+    const barHMax = 18;
+    for (let i = 0; i < prints.length; i++) {
+        const p = prints[i];
+        const x = (i / (prints.length - 1)) * (w - 20) + 10;
+        const bh = Math.max(1, (p.qty / maxV) * barHMax);
+        ctx.strokeStyle = p.side === "B" ? "rgba(34,197,94,0.65)" : "rgba(239,68,68,0.65)";
+        ctx.beginPath();
+        ctx.moveTo(x, baseY);
+        ctx.lineTo(x, baseY - bh);
+        ctx.stroke();
+    }
 }
 
 // Initialize
 connectLive();
-updateOrderBookUI();
-updateMetricsUI(0, 150);
+window.addEventListener("resize", () => {
+    if (liveMode) drawPriceChart();
+});

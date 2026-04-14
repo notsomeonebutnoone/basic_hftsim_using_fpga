@@ -1,232 +1,172 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HFT FPGA Simulator | Live Demo</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
-            color: #fff;
-            min-height: 100vh;
-        }
-        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
-        
-        /* Header */
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            margin-bottom: 30px;
-        }
-        .logo { font-size: 28px; font-weight: bold; background: linear-gradient(90deg, #00d9ff, #00ff88); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .status-badge {
-            background: rgba(0, 255, 136, 0.2);
-            border: 1px solid #00ff88;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .status-dot { width: 8px; height: 8px; background: #00ff88; border-radius: 50%; animation: pulse 2s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-        
-        /* Grid Layout */
-        .dashboard {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        .card {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 12px;
-            padding: 20px;
-            backdrop-filter: blur(10px);
-        }
-        .card h3 { font-size: 14px; color: #888; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px; }
-        
-        /* Order Book */
-        .order-book { grid-row: span 2; }
-        .order-book-table { width: 100%; border-collapse: collapse; }
-        .order-book-table th { text-align: left; padding: 8px; color: #666; font-size: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        .order-book-table td { padding: 8px; font-size: 14px; }
-        .bid-row { background: rgba(0, 255, 136, 0.1); }
-        .ask-row { background: rgba(255, 82, 82, 0.1); }
-        .bid-price { color: #00ff88; font-weight: bold; }
-        .ask-price { color: #ff5252; font-weight: bold; }
-        .spread-info { text-align: center; padding: 10px; background: rgba(255,255,255,0.05); margin: 10px 0; border-radius: 8px; }
-        
-        /* Metrics */
-        .metric-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
-        .metric-item { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; text-align: center; }
-        .metric-value { font-size: 28px; font-weight: bold; color: #00d9ff; }
-        .metric-label { font-size: 12px; color: #888; margin-top: 5px; }
-        
-        /* Chart Placeholder */
-        .chart-container { height: 200px; background: rgba(0,0,0,0.2); border-radius: 8px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
-        .chart-line { position: absolute; bottom: 20px; left: 20px; right: 20px; height: 150px; }
-        
-        /* Controls */
-        .controls { display: flex; gap: 10px; margin-top: 20px; }
-        button {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        .btn-start { background: linear-gradient(90deg, #00d9ff, #00ff88); color: #000; }
-        .btn-start:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(0, 217, 255, 0.4); }
-        .btn-stop { background: rgba(255, 82, 82, 0.2); border: 1px solid #ff5252; color: #ff5252; }
-        .btn-stop:hover { background: rgba(255, 82, 82, 0.3); }
-        
-        /* Pipeline Visualization */
-        .pipeline { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
-        .pipeline-stage {
-            background: linear-gradient(135deg, rgba(0, 217, 255, 0.2), rgba(0, 255, 136, 0.2));
-            border: 1px solid rgba(0, 217, 255, 0.3);
-            padding: 15px 20px;
-            border-radius: 8px;
-            text-align: center;
-            flex: 1;
-            margin: 0 5px;
-            position: relative;
-        }
-        .pipeline-stage.active { animation: stagePulse 1s infinite; }
-        @keyframes stagePulse { 0%, 100% { box-shadow: 0 0 20px rgba(0, 217, 255, 0.5); } 50% { box-shadow: 0 0 40px rgba(0, 217, 255, 0.8); } }
-        .pipeline-arrow { font-size: 24px; color: #00d9ff; }
-        
-        /* Live Trades */
-        .trades-list { max-height: 300px; overflow-y: auto; }
-        .trade-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 10px;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-            font-size: 13px;
-        }
-        .trade-buy { color: #00ff88; }
-        .trade-sell { color: #ff5252; }
-        
-        /* Footer */
-        footer { text-align: center; padding: 20px; color: #666; font-size: 12px; border-top: 1px solid rgba(255,255,255,0.1); margin-top: 30px; }
-    </style>
-    <link rel="stylesheet" href="styles.css" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HFT Terminal | Live</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-    <div class="container">
-        <header>
-            <div class="logo">HFT FPGA Simulator</div>
-            <div class="status-badge">
-                <div class="status-dot" id="statusDot"></div>
-                <span id="statusText">Ready</span>
-            </div>
-        </header>
-        
-        <div class="dashboard">
-            <!-- Order Book -->
-            <div class="card order-book">
-                <h3>📊 Order Book - AAPL</h3>
-                <div class="spread-info">
-                    Spread: <strong id="spread">0.00</strong> | Mid: <strong id="midPrice">0.00</strong>
-                </div>
-                <table class="order-book-table">
-                    <thead>
-                        <tr><th>Price</th><th>Size</th><th>Orders</th></tr>
-                    </thead>
-                    <tbody id="asksBody"></tbody>
-                    <tbody id="bidsBody"></tbody>
-                </table>
-            </div>
-            
-            <!-- Metrics -->
-            <div class="card">
-                <h3>⚡ Performance Metrics</h3>
-                <div class="metric-grid">
-                    <div class="metric-item">
-                        <div class="metric-value" id="latency">0</div>
-                        <div class="metric-label">Avg Latency (ns)</div>
-                    </div>
-                    <div class="metric-item">
-                        <div class="metric-value" id="throughput">0</div>
-                        <div class="metric-label">Events/sec</div>
-                    </div>
-                    <div class="metric-item">
-                        <div class="metric-value" id="volume24h">—</div>
-                        <div class="metric-label">24h Volume</div>
-                    </div>
-                    <div class="metric-item">
-                        <div class="metric-value" id="pnl">$0.00</div>
-                        <div class="metric-label">P&L</div>
-                    </div>
-                    <div class="metric-item">
-                        <div class="metric-value" id="position">0</div>
-                        <div class="metric-label">Position</div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Equity Chart -->
-            <div class="card">
-                <h3>📈 P&L Over Time</h3>
-                <div class="chart-container">
-                    <canvas id="pnlChart" class="chart-line"></canvas>
-                </div>
-            </div>
-            
-            <!-- Pipeline -->
-            <div class="card" style="grid-column: span 2;">
-                <h3>🔧 FPGA Pipeline</h3>
-                <div class="pipeline">
-                    <div class="pipeline-stage" id="stage1">
-                        <strong>Feed Parser</strong>
-                        <div style="font-size: 12px; color: #888; margin-top: 5px;">ITCH Protocol</div>
-                    </div>
-                    <div class="pipeline-arrow">→</div>
-                    <div class="pipeline-stage" id="stage2">
-                        <strong>Order Book</strong>
-                        <div style="font-size: 12px; color: #888; margin-top: 5px;">L2/L3 Management</div>
-                    </div>
-                    <div class="pipeline-arrow">→</div>
-                    <div class="pipeline-stage" id="stage3">
-                        <strong>Strategy</strong>
-                        <div style="font-size: 12px; color: #888; margin-top: 5px;">Market Making</div>
-                    </div>
-                    <div class="pipeline-arrow">→</div>
-                    <div class="pipeline-stage" id="stage4">
-                        <strong>Execution</strong>
-                        <div style="font-size: 12px; color: #888; margin-top: 5px;">Order Routing</div>
-                    </div>
-                </div>
-                <div class="controls">
-                    <button class="btn-start" onclick="startSimulation()">▶ Start Simulation</button>
-                    <button class="btn-stop" onclick="stopSimulation()">⏹ Stop</button>
-                </div>
-            </div>
-            
-            <!-- Live Trades -->
-            <div class="card">
-                <h3>💹 Live Trades</h3>
-                <div class="trades-list" id="tradesList"></div>
-            </div>
+  <div class="terminal">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="app-badge">
+          <span class="dot" id="statusDot"></span>
+          <span class="app-title">HFT Terminal</span>
         </div>
-        
-        <footer>
-            FPGA-Based HFT System | Educational Project | Not for Real Trading
-        </footer>
+        <div class="pill" id="productPill">BTC-USD</div>
+        <div class="pill muted" id="connPill">Connecting…</div>
+      </div>
+      <div class="topbar-right">
+        <button class="ghost" onclick="startSimulation()" title="Fallback local simulation">Start</button>
+        <button class="ghost" onclick="stopSimulation()" title="Fallback local simulation">Stop</button>
+      </div>
     </div>
-    
-    <script src="app.js"></script>
+
+    <div class="layout">
+      <!-- LEFT: Orderbook -->
+      <section class="window" id="winOrderbook">
+        <div class="winbar">
+          <div class="tabs">
+            <button class="tab active" data-tab="orderbook">Orderbook</button>
+            <button class="tab" data-tab="dom">DOM Ladder</button>
+            <button class="tab" data-tab="screener">Screener</button>
+            <button class="tab" data-tab="watchlist">Watchlist</button>
+          </div>
+          <div class="win-actions"><span class="xbtn" title="Close (visual only)">×</span></div>
+        </div>
+        <div class="wincontent">
+          <div class="ob-header">
+            <div class="ob-symbol">
+              <span class="sym-dot"></span>
+              <span id="obSymbol">BTC-USD</span>
+              <span class="muted">·</span>
+              <span class="muted" id="obPrice">—</span>
+            </div>
+            <div class="ob-controls">
+              <span class="chip">Center</span>
+              <span class="chip">Auto</span>
+            </div>
+          </div>
+
+          <div class="ob-grid-head">
+            <span class="muted">Price</span>
+            <span class="muted right">Size</span>
+          </div>
+          <div class="ob-grid" id="orderbookRows"></div>
+
+          <div class="ob-foot">
+            <div class="bar-split" title="Recent buy vs sell prints">
+              <div class="bar-left" id="buyPct">—</div>
+              <div class="bar-right" id="sellPct">—</div>
+            </div>
+            <div class="muted tiny" id="volSummary">24h vol: —</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CENTER: Chart -->
+      <section class="window" id="winChart">
+        <div class="winbar">
+          <div class="tabs">
+            <button class="tab active">Historical Chart</button>
+            <button class="tab">Footprint Chart</button>
+          </div>
+          <div class="win-actions"><span class="xbtn" title="Close (visual only)">×</span></div>
+        </div>
+        <div class="chartbar">
+          <div class="pill" id="chartSymbol">BTC-USD</div>
+          <div class="pill muted">Candles</div>
+          <div class="pill muted">1m</div>
+          <div class="pill muted">Live</div>
+          <div class="spacer"></div>
+          <div class="muted tiny" id="lastUpdate">—</div>
+        </div>
+        <div class="chartwrap">
+          <canvas id="priceChart" class="chart-canvas"></canvas>
+        </div>
+      </section>
+
+      <!-- BOTTOM LEFT: Trades -->
+      <section class="window" id="winTrades">
+        <div class="winbar">
+          <div class="tabs"><button class="tab active">Trades</button></div>
+          <div class="win-actions"><span class="xbtn" title="Close (visual only)">×</span></div>
+        </div>
+        <div class="wincontent">
+          <div class="trade-top">
+            <div class="ob-symbol">
+              <span class="sym-dot"></span>
+              <span id="tradesSymbol">BTC-USD</span>
+              <span class="muted">·</span>
+              <span class="muted" id="tradeCount">— trades</span>
+            </div>
+            <div class="trade-pct" aria-label="Recent buy vs sell">
+              <div class="trade-buybar" id="tradeBuyBar"></div>
+              <div class="trade-sellbar" id="tradeSellBar"></div>
+            </div>
+          </div>
+
+          <div class="table">
+            <div class="thead">
+              <div>Time</div>
+              <div>Exch</div>
+              <div class="right">Price</div>
+              <div class="right">Qty</div>
+              <div class="right">Value</div>
+              <div class="right">S</div>
+            </div>
+            <div class="tbody" id="tradesTable"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- BOTTOM RIGHT: Stats -->
+      <section class="window" id="winStats">
+        <div class="winbar">
+          <div class="tabs">
+            <button class="tab active">OB Stats</button>
+            <button class="tab">Overview</button>
+            <button class="tab">Chart</button>
+            <button class="tab">Liquidity</button>
+          </div>
+          <div class="win-actions"><span class="xbtn" title="Close (visual only)">×</span></div>
+        </div>
+        <div class="wincontent">
+          <div class="table">
+            <div class="thead">
+              <div>Exchange</div>
+              <div class="right">Mid</div>
+              <div class="right">Bid 2%</div>
+              <div class="right">Ask 2%</div>
+              <div class="right">Δ 2%</div>
+              <div class="right">Bid 10%</div>
+              <div class="right">Ask 10%</div>
+              <div class="right">Δ 10%</div>
+            </div>
+            <div class="tbody" id="statsTable"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="statusbar">
+      <div class="sb-left">
+        <span class="muted tiny">Views</span>
+        <span class="muted tiny">·</span>
+        <span class="muted tiny" id="statusText">Ready</span>
+      </div>
+      <div class="sb-right">
+        <span class="muted tiny" id="vol24hText">Vol: —</span>
+        <span class="muted tiny">|</span>
+        <span class="muted tiny" id="midText">Mid: —</span>
+        <span class="muted tiny">|</span>
+        <span class="muted tiny" id="spreadText">Spr: —</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
 </body>
 </html>
+
